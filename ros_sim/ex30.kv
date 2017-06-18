@@ -1,0 +1,72 @@
+# ex30.kv
+#:kivy 1.8.0
+#:set Top 500
+#:set Down 100
+#:set Left 200
+#:set Right 600
+#:set Width 10
+
+<Wall>:
+    canvas:
+        Color:
+            rgb: 0,.35,1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+<Ball>:
+    size: 50,50
+    canvas.after:
+        Ellipse:
+            pos: self.pos
+            size: self.size
+            source: 'kivy.png'
+
+<Ex30>:
+    size: 800, 600
+    ball1: ball_id1
+    ball2: ball_id2
+    wall_left: wallleft_id
+    wall_right: wallright_id
+    wall_top: walltop_id
+    wall_down: walldown_id
+    canvas:
+        Color:
+            rgb: 0,1,0
+        Rectangle:
+            size: root.width,root.height
+            pos: 0,0
+
+    Wall:
+        id: wallleft_id
+        size: Width,Top-Down
+        pos: Left,Down
+
+    Wall:
+        id: wallright_id
+        size: Width,Top-Down
+        pos: Right-Width,Down
+
+    Wall:
+        id: walltop_id
+        size: Right-Left,Width
+        pos: Left,Top
+
+    Wall:
+        id: walldown_id
+        size: Right-Left,Width
+        pos: Left,Down
+
+    Ball:
+        id: ball_id1
+        vel: 3,4
+        canvas.before:
+            Color:
+                rgb: .75, 0, 0
+
+    Ball:
+        id: ball_id2
+        vel: 4,3
+        canvas.before:
+            Color:
+                rgb: 1, 0, 1
