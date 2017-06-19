@@ -1,0 +1,78 @@
+#:kivy 1.0.9
+#:set Top 1400
+#:set Down 50
+#:set Left 50
+#:set Right 2750
+#:set Width 10
+
+<SimCar>:
+    size: 100, 50
+    canvas.before:
+        PushMatrix
+        Rotate:
+            angle: self.angle
+            axis: (0, 0, 1)
+            origin: self.center
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    canvas.after:
+        PopMatrix
+
+<Wall>:
+    canvas:
+        Color:
+            rgb: 0,.35,1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+<Simulator>:
+
+    car: sim_car
+    wall_left: wallleft_id
+    wall_right: wallright_id
+    wall_top: walltop_id
+    wall_down: walldown_id
+    #canvas:
+    #    Color:
+    #        rgb: 0,0,0
+    #    Rectangle:
+    #        size: root.width,root.height
+    #        pos: 0,0
+    SimCar:
+        id: sim_car
+        center: self.parent.center
+
+    Label:
+        font_size: 70
+        center_x: root.width / 4
+        top: root.top - 50
+        text: str(root.locator_x)
+
+
+    Label:
+        font_size: 70
+        center_x: root.width * 3 / 4
+        top: root.top - 50
+        text: str(root.locator_y)
+
+    Wall:
+        id: wallleft_id
+        size: Width,Top-Down
+        pos: Left,Down
+
+    Wall:
+        id: wallright_id
+        size: Width,Top-Down
+        pos: Right-Width,Down
+
+    Wall:
+        id: walltop_id
+        size: Right-Left,Width
+        pos: Left,Top
+
+    Wall:
+        id: walldown_id
+        size: Right-Left,Width
+        pos: Left,Down
