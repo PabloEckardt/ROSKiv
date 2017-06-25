@@ -45,10 +45,7 @@ class SimCar(Widget):
         global center
         global ticks
         global xv, xy
-        ticks += 1
-        if ticks % 100 == 0:
-            self.angle -= 10
-            pass
+        self.angle += .5
         self.velocity_x = math.cos((self.angle * math.pi) / 180)
         self.velocity_y = math.sin((self.angle * math.pi) / 180)
 
@@ -65,7 +62,9 @@ class Simulator(Widget): # Root Widget
 
     global x, xv
     global y, yv
-    lidar_angle = 180
+    global center
+
+    lidar_angle = 0
     car_x = NumericProperty(0)
     car_y = NumericProperty(0)
 
@@ -92,16 +91,19 @@ class Simulator(Widget): # Root Widget
         if self.car.collide_widget(self.wall_top) or self.car.collide_widget(self.wall_down):
             self.car.center = self.center
 
-        self.lidar_beam.points = [self.car.pos[0] + 25, self.car.pos[1] + 25, self.car.pos[0] + 180, self.car.pos[1] + 180]
+        adj_angle = self.lidar_angle + self.car.angle
+
+        lidar_target_x = (math.cos((adj_angle * math.pi)/180) * 250) + center[0]
+        lidar_target_y = (math.sin((adj_angle * math.pi)/180) * 250) + center[1]
+
+        self.lidar_beam.points = [center[0], center[1], lidar_target_x, lidar_target_y]
 
 class SimApp(App):
     def build(self):
         simulator = Simulator()
         simulator.start_vehicle()
-        #simulator.gen_beams([90,180,270])
         Clock.schedule_interval(simulator.update, 1.0/60.0)
         return simulator
-
 
 if __name__ == '__main__':
     SimApp().run()
