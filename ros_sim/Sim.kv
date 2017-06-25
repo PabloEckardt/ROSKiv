@@ -27,19 +27,23 @@
             size: self.size
             pos: self.pos
 
+<Barrier>:
+    canvas:
+        Line:
+            points: (2000, 1200, 800, 1200)
+            width: 10
+
 <Simulator>:
 
     car: sim_car
+
     wall_left: wallleft_id
     wall_right: wallright_id
     wall_top: walltop_id
     wall_down: walldown_id
-    #canvas:
-    #    Color:
-    #        rgb: 0,0,0
-    #    Rectangle:
-    #        size: root.width,root.height
-    #        pos: 0,0
+
+    barrier: barrier_id
+
     SimCar:
         id: sim_car
         center: self.parent.center
@@ -48,14 +52,14 @@
         font_size: 70
         center_x: root.width / 4
         top: root.top - 50
-        text: str(root.locator_x)
+        text: str(root.car_x)
 
 
     Label:
         font_size: 70
         center_x: root.width * 3 / 4
         top: root.top - 50
-        text: str(root.locator_y)
+        text: str(root.car_y)
 
     Wall:
         id: wallleft_id
@@ -76,3 +80,6 @@
         id: walldown_id
         size: Right-Left,Width
         pos: Left,Down
+
+    Barrier:
+        id: barrier_id
