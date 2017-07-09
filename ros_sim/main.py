@@ -5,9 +5,11 @@ from kivy.properties import NumericProperty, ReferenceListProperty,\
 from kivy.vector import Vector
 from kivy.clock import Clock
 from kivy.graphics import Line
+from kivy.animation import Animation
+
 from random import randint
 
-from kivy.animation import Animation
+from geometry_funcs import find_intersection
 
 import math
 
@@ -22,6 +24,7 @@ center = 0
 ticks = 0
 xv = 1
 yv = 1
+col_count = 0
 
 class Wall(Widget):
     pass
@@ -71,19 +74,23 @@ class Simulator(Widget): # Root Widget
     car = ObjectProperty(None) # Get a reference of the car object defined
                               # in the widget rules
 
+    barrier = ObjectProperty(None)
 
     def start_vehicle(self):
         self.car.center = self.center
         with self.canvas:
             self.lidar_beam = Line(points=[0,0,0,0])
+            self.barrier = Line(points=[2000,900,800,900])
 
     def update(self, dt):
-
+        global col_count
 
         self.car.move()
 
         self.car_x = x
         self.car_y = y
+
+        # Collisions with edges of map
 
         if self.car.collide_widget(self.wall_left) or self.car.collide_widget(self.wall_right):
             self.car.center = self.center
@@ -91,12 +98,27 @@ class Simulator(Widget): # Root Widget
         if self.car.collide_widget(self.wall_top) or self.car.collide_widget(self.wall_down):
             self.car.center = self.center
 
+        # update lidar widget
+
         adj_angle = self.lidar_angle + self.car.angle
 
         lidar_target_x = (math.cos((adj_angle * math.pi)/180) * 250) + center[0]
         lidar_target_y = (math.sin((adj_angle * math.pi)/180) * 250) + center[1]
 
         self.lidar_beam.points = [center[0], center[1], lidar_target_x, lidar_target_y]
+
+        # lidar collisions with barrier
+
+        p1 = (self.lidar_beam.points[0], self.lidar_beam.points[1])
+        p2 = (self.lidar_beam.points[2], self.lidar_beam.points[3])
+        p3 = (self.barrier.points[0], self.barrier.points[1])
+        p4 = (self.barrier.points[2], self.barrier.points[3])
+        distance = find_intersection(p1,p2,p3,p4)
+        if distance is not None:
+            print (distance)
+
+
+
 
 class SimApp(App):
     def build(self):
