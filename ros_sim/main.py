@@ -11,6 +11,8 @@ from random import randint
 
 from geometry_funcs import find_intersection
 
+from frame import frame
+
 import math
 
 from kivy.config import Config
@@ -24,7 +26,9 @@ center = 0
 ticks = 0
 xv = 1
 yv = 1
-col_count = 0
+default_frame = frame((700,360), ())
+
+
 
 class Wall(Widget):
     pass
@@ -57,8 +61,8 @@ class SimCar(Widget):
 
         self.pos = Vector(*self.velocity) + self.pos
 
-        x = self.center_x / 1
-        y = self.center_y / 1
+        x = self.center_x
+        y = self.center_y
         center = self.center
 
 class Simulator(Widget): # Root Widget
@@ -68,8 +72,8 @@ class Simulator(Widget): # Root Widget
     global center
 
     lidar_angle = 0
-    car_x = NumericProperty(0)
-    car_y = NumericProperty(0)
+    car_x_label = NumericProperty(0)
+    car_y_label = NumericProperty(0)
 
     car = ObjectProperty(None) # Get a reference of the car object defined
                               # in the widget rules
@@ -82,13 +86,13 @@ class Simulator(Widget): # Root Widget
             self.lidar_beam = Line(points=[0,0,0,0])
             self.barrier = Line(points=[2000,900,800,900])
 
-    def update(self, dt):
-        global col_count
+    def update(self, dt,frame = default_frame):
 
         self.car.move()
 
-        self.car_x = x
-        self.car_y = y
+
+        self.car_x_label = x
+        self.car_y_label = y
 
         # Collisions with edges of map
 
@@ -100,11 +104,19 @@ class Simulator(Widget): # Root Widget
 
         # update lidar widget
 
-        adj_angle = self.lidar_angle + self.car.angle
+        # angle of lidar relative to the car, 0 = directly forward
 
-        lidar_target_x = (math.cos((adj_angle * math.pi)/180) * 250) + center[0]
-        lidar_target_y = (math.sin((adj_angle * math.pi)/180) * 250) + center[1]
+        LIDAR_TO_CAR_ANGLE = 45
+        LIDAR_RANGE = 250
 
+        # adjust angle so it remains relative to the car
+        adj_angle = self.lidar_angle + self.car.angle + LIDAR_TO_CAR_ANGLE
+        # define a x for the lidar's end point
+        lidar_target_x = (math.cos((adj_angle * math.pi)/180) * LIDAR_RANGE) + center[0]
+        # define a y for the lidar's end point
+        lidar_target_y = (math.sin((adj_angle * math.pi)/180) * LIDAR_RANGE) + center[1]
+
+        # update the lidar
         self.lidar_beam.points = [center[0], center[1], lidar_target_x, lidar_target_y]
 
         # lidar collisions with barrier

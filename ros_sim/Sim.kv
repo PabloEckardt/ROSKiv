@@ -27,12 +27,6 @@
             size: self.size
             pos: self.pos
 
-<Barrier>:
-    canvas:
-        Line:
-            points: (2000, 1200, 800, 1200)
-            width: 10
-
 <Simulator>:
 
     car: sim_car
@@ -52,14 +46,14 @@
         font_size: 70
         center_x: root.width / 4
         top: root.top - 50
-        text: str(root.car_x)
+        text: str(root.car_x_label)
 
 
     Label:
         font_size: 70
-        center_x: root.width * 3 / 4
+        center_x: root.width * 3 / 4 - 400
         top: root.top - 50
-        text: str(root.car_y)
+        text: str(root.car_y_label)
 
     Wall:
         id: wallleft_id
