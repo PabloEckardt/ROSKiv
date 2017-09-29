@@ -6,13 +6,9 @@ from kivy.vector import Vector
 from kivy.clock import Clock
 from kivy.graphics import Line
 from kivy.animation import Animation
-
 from random import randint
-
 from geometry_funcs import find_intersection
-
 from frame import frame
-
 import math
 
 from kivy.config import Config
@@ -20,63 +16,69 @@ Config.set('graphics', 'width', '1400')
 Config.set('graphics', 'height', '720')
 Config.set('graphics', 'resizable', False)
 
-x = 0
-y = 0
-center = 0
-ticks = 0
-xv = 1
-yv = 1
-default_frame = frame((700,360),0)
+RENDERED_FRAMES =[frame()]
+CURRENT_FRAME_ID = 0
+LATEST_PUB_ANGLE = .05
 
-RENDERED_FRAMES =[]
-
-def render_frame(RENDERED_FRAMES, current_frame):
-    # if the current frame is new make a new frame to be rendered
-
-    # if the current frame is not new return the next frame
-
-
+### BARRIER AND WALL CLASSSES
 class Wall(Widget):
     pass
 
 class Barrier(Widget):
     pass
 
+def get_current_frame_id():
+
+    global CURRENT_FRAME_ID
+    return CURRENT_FRAME_ID
+
+def set_current_frame_id(num):
+    global CURRENT_FRAME_ID
+    CURRENT_FRAME_ID= num
+
+def get_next_frame(RENDERED_FRAMES):
+
+    if get_current_frame_id() == 200:
+        print ("reseting")
+        set_current_frame_id(0)
+        return get_next_frame(RENDERED_FRAMES)
+
+    current_frame = RENDERED_FRAMES[get_current_frame_id()]
+
+    if not (current_frame.tick == len(RENDERED_FRAMES)-1):
+        # if current is not the latest frame (we are repeating our steps)
+        set_current_frame_id(current_frame.tick + 1)
+        return RENDERED_FRAMES[get_current_frame_id()]
+    else:
+
+        curr_tick = current_frame.tick + 1
+        new_angle = current_frame.curr_angle + LATEST_PUB_ANGLE
+
+        velocity_x = math.cos((new_angle * math.pi) / 180)
+        velocity_y = math.sin((new_angle * math.pi) / 180)
+
+        new_position = current_frame.pos + Vector(velocity_x,velocity_y)
+
+        new_frame = frame(new_position,curr_tick,new_angle)
+        RENDERED_FRAMES.append(new_frame)
+        set_current_frame_id(curr_tick)
+
+        return new_frame
+
+
+
 class SimCar(Widget):
 
-    velocity_x = NumericProperty(0)
-    velocity_y = NumericProperty(0)
+    def move(self, frame):
 
-    angle = NumericProperty(0)
+        self.angle = frame.curr_angle
+        self.pos = frame.pos
 
-    velocity = ReferenceListProperty(velocity_x, velocity_y)
-
-
-    def move(self, angle=.75):
-        global x
-        global y
-        global center
-        global ticks
-        global xv, xy
-
-        # update the car to new angle
-        self.angle += angle
-
-        self.velocity_x = math.cos((self.angle * math.pi) / 180)
-        self.velocity_y = math.sin((self.angle * math.pi) / 180)
-
-        # update vehicle's location
-        self.pos = Vector(*self.velocity) + self.pos
-
-        x = self.center_x
-        y = self.center_y
-        center = self.center
 
 class Simulator(Widget): # Root Widget
 
-    global x, xv
-    global y, yv
-    global center
+    global x, y
+    global RENDERED_FRAMES
 
     lidar_angle = 0
     car_x_label = NumericProperty(0)
@@ -88,29 +90,31 @@ class Simulator(Widget): # Root Widget
     barrier = ObjectProperty(None)
 
     def start_vehicle(self):
-        self.car.center = self.center
         with self.canvas:
             self.lidar_beam = Line(points=[0,0,0,0])
             self.barrier = Line(points=[2000,900,800,900])
 
-    def update(self, dt,frame = default_frame):
+    def update(self, dt):
 
-        self.car.move()
-
-
-        self.car_x_label = x
-        self.car_y_label = y
+        frame = get_next_frame(RENDERED_FRAMES)
+        self.car.move(frame)
+        self.car_x_label = frame.pos[0]
+        self.car_y_label = frame.pos[1]
 
         # Collisions with edges of map
 
+
+        """
+        TODO FIX THIS
+        wall collision
         if self.car.collide_widget(self.wall_left) or self.car.collide_widget(self.wall_right):
             self.car.center = self.center
 
         if self.car.collide_widget(self.wall_top) or self.car.collide_widget(self.wall_down):
             self.car.center = self.center
+        """
 
         # update lidar widget
-
         # angle of lidar relative to the car, 0 = directly forward
 
         LIDAR_TO_CAR_ANGLE = 45
@@ -119,12 +123,12 @@ class Simulator(Widget): # Root Widget
         # adjust angle so it remains relative to the car
         adj_angle = self.lidar_angle + self.car.angle + LIDAR_TO_CAR_ANGLE
         # define a x for the lidar's end point
-        lidar_target_x = (math.cos((adj_angle * math.pi)/180) * LIDAR_RANGE) + center[0]
+        lidar_target_x = (math.cos((adj_angle * math.pi)/180) * LIDAR_RANGE) + self.car.pos[0]
         # define a y for the lidar's end point
-        lidar_target_y = (math.sin((adj_angle * math.pi)/180) * LIDAR_RANGE) + center[1]
+        lidar_target_y = (math.sin((adj_angle * math.pi)/180) * LIDAR_RANGE) + self.car.pos[1]
 
         # update the lidar
-        self.lidar_beam.points = [center[0], center[1], lidar_target_x, lidar_target_y]
+        self.lidar_beam.points = [self.car.pos[0], self.car.pos[1], lidar_target_x, lidar_target_y]
 
         # lidar collisions with barrier
 
@@ -133,8 +137,9 @@ class Simulator(Widget): # Root Widget
         p3 = (self.barrier.points[0], self.barrier.points[1])
         p4 = (self.barrier.points[2], self.barrier.points[3])
         distance = find_intersection(p1,p2,p3,p4)
+
         if distance is not None:
-            print (distance)
+            print ("distance to barrier:", distance)
 
 
 
