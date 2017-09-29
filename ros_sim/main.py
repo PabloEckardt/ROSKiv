@@ -26,8 +26,14 @@ center = 0
 ticks = 0
 xv = 1
 yv = 1
-default_frame = frame((700,360), ())
+default_frame = frame((700,360),0)
 
+RENDERED_FRAMES =[]
+
+def render_frame(RENDERED_FRAMES, current_frame):
+    # if the current frame is new make a new frame to be rendered
+
+    # if the current frame is not new return the next frame
 
 
 class Wall(Widget):
@@ -46,19 +52,20 @@ class SimCar(Widget):
     velocity = ReferenceListProperty(velocity_x, velocity_y)
 
 
-    def move(self):
+    def move(self, angle=.75):
         global x
         global y
         global center
         global ticks
         global xv, xy
-        self.angle += .5
+
+        # update the car to new angle
+        self.angle += angle
+
         self.velocity_x = math.cos((self.angle * math.pi) / 180)
         self.velocity_y = math.sin((self.angle * math.pi) / 180)
 
-        #self.velocity_y = yv
-        #self.velocity_x = xv
-
+        # update vehicle's location
         self.pos = Vector(*self.velocity) + self.pos
 
         x = self.center_x
