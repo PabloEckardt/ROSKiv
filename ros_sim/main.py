@@ -38,10 +38,13 @@ def set_current_frame_id(num):
 
 def get_next_frame(RENDERED_FRAMES):
 
+    """
+    testing moving around frames
     if get_current_frame_id() == 200:
         print ("reseting")
         set_current_frame_id(0)
         return get_next_frame(RENDERED_FRAMES)
+    """
 
     current_frame = RENDERED_FRAMES[get_current_frame_id()]
 
@@ -94,6 +97,20 @@ class Simulator(Widget): # Root Widget
             self.lidar_beam = Line(points=[0,0,0,0])
             self.barrier = Line(points=[2000,900,800,900])
 
+
+    def check_border_collision(self):
+        if self.car.collide_widget(self.wall_left) or self.car.collide_widget(self.wall_right):
+            return True
+        if self.car.collide_widget(self.wall_top) or self.car.collide_widget(self.wall_down):
+            return True
+
+        return False
+
+    def reset(self):
+        set_current_frame_id(0)
+
+
+
     def update(self, dt):
 
         frame = get_next_frame(RENDERED_FRAMES)
@@ -101,45 +118,40 @@ class Simulator(Widget): # Root Widget
         self.car_x_label = frame.pos[0]
         self.car_y_label = frame.pos[1]
 
-        # Collisions with edges of map
 
+        if self.check_border_collision():
+            # define behaviour pause, or reset
+            # reset for now
+            self.reset()
+            pass
+        else:
 
-        """
-        TODO FIX THIS
-        wall collision
-        if self.car.collide_widget(self.wall_left) or self.car.collide_widget(self.wall_right):
-            self.car.center = self.center
+            LIDAR_TO_CAR_ANGLE = 45
+            LIDAR_RANGE = 250
 
-        if self.car.collide_widget(self.wall_top) or self.car.collide_widget(self.wall_down):
-            self.car.center = self.center
-        """
+            car_center_x, car_center_y = self.car.center[0], self.car.center[1]
 
-        # update lidar widget
-        # angle of lidar relative to the car, 0 = directly forward
+            # adjust angle so it remains relative to the car
+            adj_angle = self.lidar_angle + self.car.angle + LIDAR_TO_CAR_ANGLE
 
-        LIDAR_TO_CAR_ANGLE = 45
-        LIDAR_RANGE = 250
+            # define a x for the lidar's end point
+            lidar_target_x = (math.cos((adj_angle * math.pi)/180) * LIDAR_RANGE) + car_center_x
+            # define a y for the lidar's end point
+            lidar_target_y = (math.sin((adj_angle * math.pi)/180) * LIDAR_RANGE) + car_center_y
 
-        # adjust angle so it remains relative to the car
-        adj_angle = self.lidar_angle + self.car.angle + LIDAR_TO_CAR_ANGLE
-        # define a x for the lidar's end point
-        lidar_target_x = (math.cos((adj_angle * math.pi)/180) * LIDAR_RANGE) + self.car.pos[0]
-        # define a y for the lidar's end point
-        lidar_target_y = (math.sin((adj_angle * math.pi)/180) * LIDAR_RANGE) + self.car.pos[1]
+            # update the lidar
+            self.lidar_beam.points = [car_center_x, car_center_y, lidar_target_x, lidar_target_y]
 
-        # update the lidar
-        self.lidar_beam.points = [self.car.pos[0], self.car.pos[1], lidar_target_x, lidar_target_y]
+            # lidar collisions with barrier
 
-        # lidar collisions with barrier
+            p1 = (self.lidar_beam.points[0], self.lidar_beam.points[1])
+            p2 = (self.lidar_beam.points[2], self.lidar_beam.points[3])
+            p3 = (self.barrier.points[0], self.barrier.points[1])
+            p4 = (self.barrier.points[2], self.barrier.points[3])
+            distance = find_intersection(p1,p2,p3,p4)
 
-        p1 = (self.lidar_beam.points[0], self.lidar_beam.points[1])
-        p2 = (self.lidar_beam.points[2], self.lidar_beam.points[3])
-        p3 = (self.barrier.points[0], self.barrier.points[1])
-        p4 = (self.barrier.points[2], self.barrier.points[3])
-        distance = find_intersection(p1,p2,p3,p4)
-
-        if distance is not None:
-            print ("distance to barrier:", distance)
+            if distance is not None:
+                print ("distance to barrier:", distance)
 
 
 
