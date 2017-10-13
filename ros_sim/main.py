@@ -10,6 +10,8 @@ from random import randint
 from geometry_funcs import find_intersection
 from frame import frame
 import math
+from kivy.uix.textinput import TextInput
+
 
 from kivy.config import Config
 Config.set('graphics', 'width', '1400')
@@ -18,7 +20,11 @@ Config.set('graphics', 'resizable', False)
 
 RENDERED_FRAMES =[frame()]
 CURRENT_FRAME_ID = 0
-LATEST_PUB_ANGLE = .05
+LATEST_PUB_ANGLE = .5
+
+def on_enter(instance, value):
+    print('User pressed enter in', instance)
+
 
 ### BARRIER AND WALL CLASSSES
 class Wall(Widget):
@@ -89,6 +95,9 @@ class Simulator(Widget): # Root Widget
 
     car = ObjectProperty(None) # Get a reference of the car object defined
                               # in the widget rules
+
+    textinput = TextInput(text='Hello world', multiline=False)
+    textinput.bind(on_text_validate=on_enter)
 
     barrier = ObjectProperty(None)
 
