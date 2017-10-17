@@ -6,14 +6,17 @@ from kivy.vector import Vector
 from kivy.clock import Clock
 from kivy.graphics import Line
 from kivy.animation import Animation
+from kivy.lang import Builder
 from random import randint
 from geometry_funcs import find_intersection
 from frame import frame
 import math
 from kivy.uix.textinput import TextInput
 
+Builder.load_file("Sim.kv")
 
 from kivy.config import Config
+
 Config.set('graphics', 'width', '1400')
 Config.set('graphics', 'height', '720')
 Config.set('graphics', 'resizable', False)
@@ -21,9 +24,6 @@ Config.set('graphics', 'resizable', False)
 RENDERED_FRAMES =[frame()]
 CURRENT_FRAME_ID = 0
 LATEST_PUB_ANGLE = .5
-
-def on_enter(instance, value):
-    print('User pressed enter in', instance)
 
 
 ### BARRIER AND WALL CLASSSES
@@ -96,15 +96,12 @@ class Simulator(Widget): # Root Widget
     car = ObjectProperty(None) # Get a reference of the car object defined
                               # in the widget rules
 
-    textinput = TextInput(text='Hello world', multiline=False)
-    textinput.bind(on_text_validate=on_enter)
-
-    barrier = ObjectProperty(None)
+    barrier = ObjectProperty(None, allownone=True)
 
     def start_vehicle(self):
         with self.canvas:
             self.lidar_beam = Line(points=[0,0,0,0])
-            self.barrier = Line(points=[2000,900,800,900])
+            self.barrier = Line(points=[0,0,1400,720])
 
 
     def check_border_collision(self):
@@ -131,7 +128,7 @@ class Simulator(Widget): # Root Widget
         if self.check_border_collision():
             # define behaviour pause, or reset
             # reset for now
-            self.reset()
+            # self.reset()
             pass
         else:
 
@@ -161,9 +158,6 @@ class Simulator(Widget): # Root Widget
 
             if distance is not None:
                 print ("distance to barrier:", distance)
-
-
-
 
 class SimApp(App):
     def build(self):

@@ -1,14 +1,14 @@
-#:kivy 1.0.9
-#:set Top 1400
-#:set Down 50
-#:set Left 50
-#:set Right 2750
+#:kivy 1.10.0
+#:set Top 720
+#:set Down 25
+#:set Left 25
+#:set Right 1400
 #:set Width 10
 
 <SimCar>:
     size: 100, 50
     angle: 0
-    pos: (700,700)
+    pos: (350,350)
     canvas.before:
         PushMatrix
         Rotate:
@@ -45,36 +45,40 @@
         center: self.parent.center
 
     Label:
-        font_size: 70
+        font_size: 25
         center_x: root.width / 4
         top: root.top - 50
         text: str(root.car_x_label)
 
 
     Label:
-        font_size: 70
-        center_x: root.width * 3 / 4 - 400
+        font_size: 25
+        center_x: root.width * 3 / 4 - 150
         top: root.top - 50
         text: str(root.car_y_label)
 
+	# LEFT
     Wall:
         id: wallleft_id
-        size: Width,Top-Down
-        pos: Left,Down
+        size: Width,Top-Down*2
+        pos: 25,25
 
+	# RIGHT
     Wall:
         id: wallright_id
-        size: Width,Top-Down
-        pos: Right-Width,Down
+        size: 10,Top-Down*2
+        pos: 1360,Down
 
+	# TOP
     Wall:
         id: walltop_id
-        size: Right-Left,Width
-        pos: Left,Top
+        size: 1345,10
+        pos: 25,695
 
+	# BOTTOM
     Wall:
         id: walldown_id
-        size: Right-Left,Width
+        size: 1345,10
         pos: Left,Down
 
     Barrier:
