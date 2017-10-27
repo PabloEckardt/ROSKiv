@@ -1,10 +1,11 @@
+from numpy import interp
 from kivy.app import App
 from kivy.uix.widget import Widget
 from kivy.properties import NumericProperty, ReferenceListProperty,\
     ObjectProperty
 from kivy.vector import Vector
 from kivy.clock import Clock
-from kivy.graphics import Line
+from kivy.graphics import Line, Color
 from kivy.animation import Animation
 from kivy.lang import Builder
 from random import randint
@@ -12,10 +13,15 @@ from geometry_funcs import find_intersection
 from frame import frame
 import math
 from kivy.uix.textinput import TextInput
-
 Builder.load_file("Sim.kv")
-
 from kivy.config import Config
+
+import rospy
+from race.msg import pid_input
+
+import json
+
+pub = rospy.Publisher('error', pid_input, queue_size=1)
 
 Config.set('graphics', 'width', '1400')
 Config.set('graphics', 'height', '720')
@@ -23,8 +29,9 @@ Config.set('graphics', 'resizable', False)
 
 RENDERED_FRAMES =[frame()]
 CURRENT_FRAME_ID = 0
-LATEST_PUB_ANGLE = .5
+LATEST_PUB_ANGLE = 0
 
+from race.msg import pid_input
 
 ### BARRIER AND WALL CLASSSES
 class Wall(Widget):
@@ -34,13 +41,22 @@ class Barrier(Widget):
     pass
 
 def get_current_frame_id():
-
     global CURRENT_FRAME_ID
     return CURRENT_FRAME_ID
 
 def set_current_frame_id(num):
     global CURRENT_FRAME_ID
     CURRENT_FRAME_ID= num
+
+def update_drive_params():
+    global LATEST_PUB_ANGLE
+    try:
+        with open("published_dp.txt", "r") as infile:
+            LATEST_PUB_ANGLE += float(infile.read())
+    except Exception as e:
+        print e
+        print "error reading dp"
+
 
 def get_next_frame(RENDERED_FRAMES):
 
@@ -60,8 +76,11 @@ def get_next_frame(RENDERED_FRAMES):
         return RENDERED_FRAMES[get_current_frame_id()]
     else:
 
+        update_drive_params();
+        new_angle = LATEST_PUB_ANGLE
         curr_tick = current_frame.tick + 1
-        new_angle = current_frame.curr_angle + LATEST_PUB_ANGLE
+
+        ##print new_angle
 
         velocity_x = math.cos((new_angle * math.pi) / 180)
         velocity_y = math.sin((new_angle * math.pi) / 180)
@@ -96,12 +115,33 @@ class Simulator(Widget): # Root Widget
     car = ObjectProperty(None) # Get a reference of the car object defined
                               # in the widget rules
 
-    barrier = ObjectProperty(None, allownone=True)
+    barriers = None
+
+    def load_map(self,map_id):
+        print "loading the map"
+        with self.canvas:
+            with open ("maps.json", "r") as mapfile:
+                map_data = json.load(mapfile)
+                m = map_data[str(map_id)]
+                self.barriers = [ObjectProperty(None,allownone=True) for i in range (len(m))]
+
+                print ("barriers: " + str(len(self.barriers)))
+
+                for i,line in enumerate(m):
+                    _line = map(int,m[line].split(","))
+                    points = _line[0:4] 
+                    c  = _line[4:7]
+                    # set color and draw the line 
+                    print line, points, c
+                    Color(c)
+                    self.barriers[i] = Line(points=points)
+                    #Line(points=points, width=1)
+        print ("end load map")
 
     def start_vehicle(self):
         with self.canvas:
             self.lidar_beam = Line(points=[0,0,0,0])
-            self.barrier = Line(points=[0,0,1400,720])
+
 
 
     def check_border_collision(self):
@@ -114,7 +154,6 @@ class Simulator(Widget): # Root Widget
 
     def reset(self):
         set_current_frame_id(0)
-
 
 
     def update(self, dt):
@@ -131,9 +170,8 @@ class Simulator(Widget): # Root Widget
             # self.reset()
             pass
         else:
-
             LIDAR_TO_CAR_ANGLE = 45
-            LIDAR_RANGE = 250
+            LIDAR_RANGE = 250 # in cms
 
             car_center_x, car_center_y = self.car.center[0], self.car.center[1]
 
@@ -148,23 +186,37 @@ class Simulator(Widget): # Root Widget
             # update the lidar
             self.lidar_beam.points = [car_center_x, car_center_y, lidar_target_x, lidar_target_y]
 
-            # lidar collisions with barrier
-
+            # lidar collisions with barriers
+            distance = 1000
             p1 = (self.lidar_beam.points[0], self.lidar_beam.points[1])
             p2 = (self.lidar_beam.points[2], self.lidar_beam.points[3])
-            p3 = (self.barrier.points[0], self.barrier.points[1])
-            p4 = (self.barrier.points[2], self.barrier.points[3])
-            distance = find_intersection(p1,p2,p3,p4)
+            for b in self.barriers:
+                p3 = (b.points[0], b.points[1])
+                p4 = (b.points[2], b.points[3])
+                _distance = find_intersection(p1,p2,p3,p4)
+                if _distance is not None: 
+                    # on many intersecting walls, pick the closest one
+                    distance = min(distance,_distance)
+            print distance
 
+            msg = pid_input()
             if distance is not None:
-                print ("distance to barrier:", distance)
+                #print ("distance to barrier:", distance)
+                msg.pid_error = interp(distance, [0,250],[-100,100])
+            else:
+                msg.pid_error = 1000
+            #print (msg.pid_error)
+            pub.publish(msg)
+
 
 class SimApp(App):
     def build(self):
         simulator = Simulator()
         simulator.start_vehicle()
+        simulator.load_map(2)
         Clock.schedule_interval(simulator.update, 1.0/60.0)
         return simulator
 
 if __name__ == '__main__':
+    rospy.init_node('sim_error', anonymous=True)
     SimApp().run()
