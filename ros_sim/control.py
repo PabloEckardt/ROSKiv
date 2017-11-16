@@ -15,9 +15,9 @@ pub = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
 
 def calc_angle(error):
 	if error < 0:
-		return -0.20
+		return -2
 	else:
-		return 0.20
+		return 2
 
 
 
@@ -34,7 +34,7 @@ def control(data):
 
 	## END
 	angle = calc_angle(float(data.pid_error))
-	print str(angle) + " " + str(data.pid_error)
+	#print str(angle) + " " + str(data.pid_error)
 	msg = drive_param();
 	msg.velocity = vel_input	
 	msg.angle = angle
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 	global kp
 	global kd
 	global vel_input
-	print("Listening for error input")
+	print("Control node initialized. Listening for error input")
 	#kp = input("Enter Kp Value: ")
 	#kd = input("Enter Kd Value: ")
 	#vel_input = input("Enter Velocity: ")

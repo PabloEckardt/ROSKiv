@@ -20,6 +20,16 @@ import rospy
 from race.msg import pid_input
 
 import json
+from enum import Enum
+import pickle
+from datetime import datetime
+import os
+
+class SAVE_OPTIONS(Enum):
+    NO = 1
+    FAILURE = 2
+    SUCCESS_FAILURE = 3
+
 
 pub = rospy.Publisher('error', pid_input, queue_size=1)
 
@@ -30,6 +40,7 @@ Config.set('graphics', 'resizable', False)
 RENDERED_FRAMES =[frame()]
 CURRENT_FRAME_ID = 0
 LATEST_PUB_ANGLE = 0
+SAVE_TRIGGER = SAVE_OPTIONS.NO
 
 from race.msg import pid_input
 
@@ -51,12 +62,20 @@ def set_current_frame_id(num):
 def update_drive_params():
     global LATEST_PUB_ANGLE
     try:
+        line = None
         with open("published_dp.txt", "r") as infile:
-            LATEST_PUB_ANGLE += float(infile.read())
+            line = infile.read()
+            LATEST_PUB_ANGLE += float(line)
     except Exception as e:
-        print e
-        print "error reading dp"
+        pass
 
+def get_save_trigger(n):
+    if n == 1:
+        return SAVE_OPTIONS.NO
+    elif n == 2:
+        return SAVE_OPTIONS.FAILURE
+    else:
+        return SAVE_OPTIONS.SUCCESS_FAILURE
 
 def get_next_frame(RENDERED_FRAMES):
 
@@ -165,12 +184,22 @@ class Simulator(Widget): # Root Widget
 
 
         if self.check_border_collision():
-            # define behaviour pause, or reset
-            # reset for now
-            # self.reset()
-            pass
+            if SAVE_TRIGGER == SAVE_OPTIONS.FAILURE or SAVE_TRIGGER == SAVE_OPTIONS.SUCCESS_FAILURE:
+                if SAVE_TRIGGER == SAVE_OPTIONS.SUCCESS_FAILURE:
+                    tag = "ANY"
+                else:
+                    tag = "FAILURE"
+                label = "simulations/"+tag+str(datetime.now())
+                with open (label, "w") as outfile:
+                    try:
+                        pickle.dump(RENDERED_FRAMES, outfile)
+                        print ("saved log file: " + label)
+                    except Exception as e:
+                        print ("failure to save log")
+
+            self.reset()
         else:
-            LIDAR_TO_CAR_ANGLE = 45
+            LIDAR_TO_CAR_ANGLE = 45 # degrees
             LIDAR_RANGE = 250 # in cms
 
             car_center_x, car_center_y = self.car.center[0], self.car.center[1]
@@ -197,7 +226,7 @@ class Simulator(Widget): # Root Widget
                 if _distance is not None: 
                     # on many intersecting walls, pick the closest one
                     distance = min(distance,_distance)
-            print distance
+            #print distance
 
             msg = pid_input()
             if distance is not None:
@@ -213,10 +242,36 @@ class SimApp(App):
     def build(self):
         simulator = Simulator()
         simulator.start_vehicle()
-        simulator.load_map(2)
-        Clock.schedule_interval(simulator.update, 1.0/60.0)
+        simulator.load_map(1)
+        Clock.schedule_interval(simulator.update, 1.0/120.0)
         return simulator
 
 if __name__ == '__main__':
+
+    print "Load Simulation?: "
+    load_sim = raw_input()
+
+    if load_sim == "y" or load_sim == "yes":
+        # if loading dont need to save
+        SAVE_TRIGGER = SAVE_OPTIONS.NO
+        l = os.listdir("simulations/")
+        for index,sim in enumerate(l):
+            print ( "[ " + str(index) + " ] " + sim)
+        sim = -1
+        while sim < 0 or sim > len(l) - 1:
+            print ("select a simulation's number: ")
+            sim = int(raw_input())
+
+        file = l[sim]
+        with open ("simulations/"+file, "rb") as infile:
+            RENDERED_FRAMES = pickle.load(infile)
+
+    else:
+        print "Save simulation? 1 = no, 2 = on success, 3 = on success or failure"
+        _save = int(raw_input())
+        assert _save == 1 or _save == 2 or _save == 3
+        SAVE_TRIGGER = get_save_trigger(_save)
+
     rospy.init_node('sim_error', anonymous=True)
+
     SimApp().run()
