@@ -39,3 +39,26 @@ def find_intersection( p0, p1, p2, p3 ) :
     d = dist_two_points (p0, intersection_point)
 
     return d
+
+def get_bounding_points(x, y, angle):
+    """
+    given the center of the car, get the 4 points bounding the vehicle which
+    rotate.
+    """
+    # get the angles relative to the vehicle orientation.
+
+    angle_1 = angle + 26.6
+    angle_2 = angle_1 + 90
+    angle_3 = angle_2 + 90
+    angle_4 = angle_3 + 90 
+
+    # we know the car's dimensions.
+    # this is the diagonal size of the car divided by two
+    radious = 56
+
+    point1 = [radious*math.cos(angle_1) + x, radious*math.sin(angle_1) + y]
+    point2 = [radious*math.cos(angle_2) + x, radious*math.sin(angle_2) + y]
+    point3 = [radious*math.cos(angle_3) + x, radious*math.sin(angle_3) + y]
+    point4 = [radious*math.cos(angle_4) + x, radious*math.sin(angle_4) + y]
+
+    return [point1,point2,point3,point4]

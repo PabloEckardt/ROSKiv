@@ -1,63 +1,67 @@
-from numpy import interp
 from kivy.app import App
 from kivy.uix.widget import Widget
 from kivy.properties import NumericProperty, ReferenceListProperty,\
-    ObjectProperty
+     ObjectProperty
 from kivy.vector import Vector
 from kivy.clock import Clock
 from kivy.graphics import Line, Color
 from kivy.animation import Animation
 from kivy.lang import Builder
 from random import randint
-from geometry_funcs import find_intersection
-from frame import frame
-import math
 from kivy.uix.textinput import TextInput
-Builder.load_file("Sim.kv")
 from kivy.config import Config
 
 import rospy
 from race.msg import pid_input
+from race.msg import pid_input
 
-import json
-from enum import Enum
-import pickle
-from datetime import datetime
-import os
+import  json
+from    enum import Enum
+import  pickle
+from    datetime import datetime
+import  os
+from    numpy import interp
+from    frame import frame
+import  math
+from    geometry_funcs import find_intersection, get_bounding_points
+
+pub = rospy.Publisher('error', pid_input, queue_size=1)
+Builder.load_file("Sim.kv")
+Config.set('graphics', 'width', '1400')
+Config.set('graphics', 'height', '720')
+Config.set('graphics', 'resizable', False)
+
 
 class SAVE_OPTIONS(Enum):
     NO = 1
     FAILURE = 2
     SUCCESS_FAILURE = 3
 
-
-pub = rospy.Publisher('error', pid_input, queue_size=1)
-
-Config.set('graphics', 'width', '1400')
-Config.set('graphics', 'height', '720')
-Config.set('graphics', 'resizable', False)
-
 RENDERED_FRAMES =[frame()]
 CURRENT_FRAME_ID = 0
 LATEST_PUB_ANGLE = 0
 SAVE_TRIGGER = SAVE_OPTIONS.NO
+MAP_SELECTION = 1
+TARGET_CENTER = []
 
-from race.msg import pid_input
 
-### BARRIER AND WALL CLASSSES
 class Wall(Widget):
     pass
 
+
 class Barrier(Widget):
     pass
+
 
 def get_current_frame_id():
     global CURRENT_FRAME_ID
     return CURRENT_FRAME_ID
 
+
 def set_current_frame_id(num):
     global CURRENT_FRAME_ID
     CURRENT_FRAME_ID= num
+
 
 def update_drive_params():
     global LATEST_PUB_ANGLE
@@ -69,6 +73,7 @@ def update_drive_params():
     except Exception as e:
         pass
 
+
 def get_save_trigger(n):
     if n == 1:
         return SAVE_OPTIONS.NO
@@ -77,15 +82,8 @@ def get_save_trigger(n):
     else:
         return SAVE_OPTIONS.SUCCESS_FAILURE
 
-def get_next_frame(RENDERED_FRAMES):
 
-    """
-    testing moving around frames
-    if get_current_frame_id() == 200:
-        print ("reseting")
-        set_current_frame_id(0)
-        return get_next_frame(RENDERED_FRAMES)
-    """
+def get_next_frame(RENDERED_FRAMES):
 
     current_frame = RENDERED_FRAMES[get_current_frame_id()]
 
@@ -99,8 +97,6 @@ def get_next_frame(RENDERED_FRAMES):
         new_angle = LATEST_PUB_ANGLE
         curr_tick = current_frame.tick + 1
 
-        ##print new_angle
-
         velocity_x = math.cos((new_angle * math.pi) / 180)
         velocity_y = math.sin((new_angle * math.pi) / 180)
 
@@ -111,7 +107,6 @@ def get_next_frame(RENDERED_FRAMES):
         set_current_frame_id(curr_tick)
 
         return new_frame
-
 
 
 class SimCar(Widget):
@@ -141,35 +136,85 @@ class Simulator(Widget): # Root Widget
         with self.canvas:
             with open ("maps.json", "r") as mapfile:
                 map_data = json.load(mapfile)
+                # select a map from the json
                 m = map_data[str(map_id)]
-                self.barriers = [ObjectProperty(None,allownone=True) for i in range (len(m))]
-
-                print ("barriers: " + str(len(self.barriers)))
-
-                for i,line in enumerate(m):
-                    _line = map(int,m[line].split(","))
-                    points = _line[0:4] 
-                    c  = _line[4:7]
-                    # set color and draw the line 
-                    print line, points, c
-                    Color(c)
-                    self.barriers[i] = Line(points=points)
-                    #Line(points=points, width=1)
-        print ("end load map")
+                j = 0
+                # Draw the lines
+                for k in m:
+                    self.barriers = []
+                    if not k == "target":
+                        self.barriers.append(ObjectProperty(None,
+                                                            allownone=True))
+                        _line = map(int,m[k].split(","))
+                        points = _line[0:4] 
+                        r = _line[4]
+                        g = _line[5]
+                        b = _line[6]
+                        Color(r,g,b)
+                        self.barriers[j] = Line(points=points)
+                j += 1
+                # Draw the target
+                target = map(int,m["target"].split(","))
+                TARGET_CENTER = [int(target[0]), int(target[1])]
+                self.target = ObjectProperty(None,allownone=True)
+                Color (67/255.0,242/255.0,155/255.0)
+                self.target = Line(circle=( 
+                                            TARGET_CENTER[0],
+                                            TARGET_CENTER[1], 
+                                            target[2]
+                                            ), width = 3)
+            assert len (TARGET_CENTER) == 2
 
     def start_vehicle(self):
         with self.canvas:
             self.lidar_beam = Line(points=[0,0,0,0])
 
 
-
     def check_border_collision(self):
-        if self.car.collide_widget(self.wall_left) or self.car.collide_widget(self.wall_right):
+        if self.car.collide_widget(self.wall_left)  \
+        or self.car.collide_widget(self.wall_right) \
+        or self.car.collide_widget(self.wall_top)   \
+        or self.car.collide_widget(self.wall_down):
             return True
-        if self.car.collide_widget(self.wall_top) or self.car.collide_widget(self.wall_down):
-            return True
-
         return False
+
+    def check_barrier_collision(self):
+
+        # car's bounding box
+        bb = get_bounding_points(self.car.get_center_x(), 
+                                        self.car.get_center_y(), 
+                                        self.car.angle)
+
+        car_lines = [(bb[0],bb[1]),
+                    (bb[1],bb[2]), 
+                    (bb[2],bb[3]),
+                    (bb[3],bb[0]) ]
+
+        for car_line in car_lines:
+            p1,p2 = car_line        
+            for b in self.barriers:
+                p3 = (b.points[0], b.points[1])
+                p4 = (b.points[2], b.points[3])
+                _distance = find_intersection(p1,p2,p3,p4)
+                if _distance is not None: 
+                    # found collision
+                    return True
+        return False
+
+    def get_lidar_measurement(self):
+
+        distance = 1000
+        p1 = (self.lidar_beam.points[0], self.lidar_beam.points[1])
+        p2 = (self.lidar_beam.points[2], self.lidar_beam.points[3])
+        for b in self.barriers:
+            p3 = (b.points[0], b.points[1])
+            p4 = (b.points[2], b.points[3])
+            _distance = find_intersection(p1,p2,p3,p4)
+            if _distance is not None: 
+                # on many intersecting walls, pick the closest one
+                distance = min(distance,_distance)
+        return None
+
 
     def reset(self):
         set_current_frame_id(0)
@@ -179,12 +224,12 @@ class Simulator(Widget): # Root Widget
 
         frame = get_next_frame(RENDERED_FRAMES)
         self.car.move(frame)
-        self.car_x_label = frame.pos[0]
-        self.car_y_label = frame.pos[1]
+        self.car_x_label = self.car.get_center_x()
+        self.car_y_label = self.car.get_center_y()
+        if self.check_border_collision() or self.check_barrier_collision():
 
-
-        if self.check_border_collision():
-            if SAVE_TRIGGER == SAVE_OPTIONS.FAILURE or SAVE_TRIGGER == SAVE_OPTIONS.SUCCESS_FAILURE:
+            if SAVE_TRIGGER == SAVE_OPTIONS.FAILURE \
+            or SAVE_TRIGGER == SAVE_OPTIONS.SUCCESS_FAILURE:
                 if SAVE_TRIGGER == SAVE_OPTIONS.SUCCESS_FAILURE:
                     tag = "ANY"
                 else:
@@ -201,40 +246,33 @@ class Simulator(Widget): # Root Widget
         else:
             LIDAR_TO_CAR_ANGLE = 45 # degrees
             LIDAR_RANGE = 250 # in cms
-
             car_center_x, car_center_y = self.car.center[0], self.car.center[1]
-
             # adjust angle so it remains relative to the car
             adj_angle = self.lidar_angle + self.car.angle + LIDAR_TO_CAR_ANGLE
 
-            # define a x for the lidar's end point
-            lidar_target_x = (math.cos((adj_angle * math.pi)/180) * LIDAR_RANGE) + car_center_x
-            # define a y for the lidar's end point
-            lidar_target_y = (math.sin((adj_angle * math.pi)/180) * LIDAR_RANGE) + car_center_y
+            # define a x for the lidar's beam end point
+            lidar_target_x = (math.cos((adj_angle * math.pi)/180) \
+                             * LIDAR_RANGE) + car_center_x
+            lidar_target_y = (math.sin((adj_angle * math.pi)/180) \
+                             * LIDAR_RANGE) + car_center_y
 
             # update the lidar
-            self.lidar_beam.points = [car_center_x, car_center_y, lidar_target_x, lidar_target_y]
+            self.lidar_beam.points = [  car_center_x,
+                                        car_center_y, 
+                                        lidar_target_x, 
+                                        lidar_target_y]
 
             # lidar collisions with barriers
-            distance = 1000
-            p1 = (self.lidar_beam.points[0], self.lidar_beam.points[1])
-            p2 = (self.lidar_beam.points[2], self.lidar_beam.points[3])
-            for b in self.barriers:
-                p3 = (b.points[0], b.points[1])
-                p4 = (b.points[2], b.points[3])
-                _distance = find_intersection(p1,p2,p3,p4)
-                if _distance is not None: 
-                    # on many intersecting walls, pick the closest one
-                    distance = min(distance,_distance)
-            #print distance
+            distance = self.get_lidar_measurement()
 
             msg = pid_input()
             if distance is not None:
-                #print ("distance to barrier:", distance)
+                ############ YOUR CODE GOES HERE ################
+                # At this point distance is a the value of the closer object
+                # observerd by the lidar
                 msg.pid_error = interp(distance, [0,250],[-100,100])
             else:
-                msg.pid_error = 1000
-            #print (msg.pid_error)
+                msg.pid_error = distance
             pub.publish(msg)
 
 
@@ -242,14 +280,21 @@ class SimApp(App):
     def build(self):
         simulator = Simulator()
         simulator.start_vehicle()
-        simulator.load_map(1)
-        Clock.schedule_interval(simulator.update, 1.0/120.0)
+        simulator.load_map(MAP_SELECTION)
+        Clock.schedule_interval(simulator.update, 1.0/30.0)
         return simulator
+
 
 if __name__ == '__main__':
 
-    print "Load Simulation?: "
-    load_sim = raw_input()
+    global MAP_SELECTION
+
+    load_sim = None
+    print "Load Simulation?: y/n"
+    while not load_sim == "y"   and not load_sim == "yes" \
+                                and not load_sim == "n" \
+                                and not load_sim == "no":
+        load_sim = raw_input()
 
     if load_sim == "y" or load_sim == "yes":
         # if loading dont need to save
@@ -267,6 +312,8 @@ if __name__ == '__main__':
             RENDERED_FRAMES = pickle.load(infile)
 
     else:
+        print ("Enter Map Number: ")
+        MAP_SELECTION = int(raw_input())
         print "Save simulation? 1 = no, 2 = on success, 3 = on success or failure"
         _save = int(raw_input())
         assert _save == 1 or _save == 2 or _save == 3
