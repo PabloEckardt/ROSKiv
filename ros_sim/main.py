@@ -115,36 +115,24 @@ def get_next_frame(RENDERED_FRAMES):
 
 class SimCar(Widget):
 
+
     relative_angle = 0
 
     def get_effective_angle(self, relative_angle):
-        print "rel angle ", relative_angle
-        return relative_angle
-        #return interp(relative_angle, [-60.0,60.0],[-5,5])
+        relative_angle = 75 if relative_angle > 75 else -75 if relative_angle < -75 else relative_angle
+        return interp(relative_angle, [-75.0,75.0],[-.4,.4])
 
 
     def move(self, frame):
         try:
 
-            target_angle = frame.target_angle
-
-            if self.relative_angle < target_angle:
-                self.relative_angle += .3
-                self.angle += .3
-
-            elif self.relative_angle > target_angle:
-                self.relative_angle -= .3
-                self.angle -= .3
+            self.angle += self.get_effective_angle(frame.target_angle)
 
 
-
-            effective_angle = self.get_effective_angle(self.relative_angle)
-
-            velocity_x = math.cos((effective_angle * math.pi) / 180)
-            velocity_y = math.sin((effective_angle * math.pi) / 180)
+            velocity_x = math.cos((self.angle * math.pi) / 180)
+            velocity_y = math.sin((self.angle * math.pi) / 180)
 
             self.pos = Vector(self.pos[0], self.pos[1]) + Vector(velocity_x,velocity_y)
-            print effective_angle
 
         except Exception as move_exception:
             print move_exception
@@ -230,7 +218,7 @@ class Simulator(Widget): # Root Widget
     def start_vehicle(self):
         with self.canvas:
             self.lidar_beam = Line(points=[0,0,0,0])
-            self.pos = [-500,-200]
+            self.pos = Vector(-500,-200)
 
 
     def check_border_collision(self):
@@ -299,7 +287,11 @@ class Simulator(Widget): # Root Widget
         return False
 
     def reset(self):
+        global TRACE_ROUTE
         set_current_frame_id(0)
+        self.car.pos = [150,135]
+        self.car.angle = 0
+        TRACE_ROUTE = False
 
     def draw_labels(self):
         self.car_x_label = "x: " + str(int(self.car.get_center_x()))
@@ -334,6 +326,7 @@ class Simulator(Widget): # Root Widget
         global LIDAR_RANGE
         global LIDAR_TO_CAR_ANGLE
 
+        print(len(RENDERED_FRAMES))
         if len(RENDERED_FRAMES) > 5:
             pass
 
