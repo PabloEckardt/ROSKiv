@@ -1,9 +1,8 @@
 from kivy.vector import Vector
 
 class frame:
-    def __init__(self, pos=Vector(200,100),tick=0,curr_angle=0):
+    def __init__(self,tick=0,target_angle=0):
 
-        self.curr_angle = curr_angle
-        self.pos = pos
+        self.target_angle = target_angle
         self.tick = tick
 

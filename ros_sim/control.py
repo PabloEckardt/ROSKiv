@@ -15,11 +15,9 @@ pub = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
 
 def calc_angle(error):
 	if error < 0:
-		return -2
+		return -90
 	else:
-		return 2
-
-
+		return 90
 
 def control(data):
 	global prev_error
@@ -32,6 +30,7 @@ def control(data):
 	# 2. Apply the PID equation on error
 	# 3. Make sure the error is within bounds
 
+	print "received error: " + str(data.pid_error)
 	## END
 	angle = calc_angle(float(data.pid_error))
 	#print str(angle) + " " + str(data.pid_error)

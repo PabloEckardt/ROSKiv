@@ -39,6 +39,9 @@ def find_intersection( p0, p1, p2, p3 ) :
     d = dist_two_points (p0, intersection_point)
 
     return d
+    
+def deg_to_rads(deg):
+    return (deg*math.pi)/180.0
 
 def get_bounding_points(x, y, angle):
     """
@@ -47,10 +50,15 @@ def get_bounding_points(x, y, angle):
     """
     # get the angles relative to the vehicle orientation.
 
-    angle_1 = angle + 26.6
-    angle_2 = angle_1 + 90
-    angle_3 = angle_2 + 90
-    angle_4 = angle_3 + 90 
+    d_angle_1 = angle + 26.6
+    d_angle_2 = (180 - 26) + angle
+    d_angle_3 = 180 + d_angle_1
+    d_angle_4 = angle - 26.6
+
+    angle_1 = deg_to_rads(d_angle_1)
+    angle_2 = deg_to_rads(d_angle_2)
+    angle_3 = deg_to_rads(d_angle_3)
+    angle_4 = deg_to_rads(d_angle_4)
 
     # we know the car's dimensions.
     # this is the diagonal size of the car divided by two
