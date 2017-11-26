@@ -1,4 +1,12 @@
 import math
+from shapely.geometry import Point
+from shapely.geometry.polygon import Polygon
+
+def contains(point, polygon):
+
+    p = Point(point[0],point[1])
+    pol = Polygon(polygon)
+    return pol.contains(p)
 
 
 def dist_two_points(p1,p2):
@@ -62,7 +70,7 @@ def get_bounding_points(x, y, angle):
 
     # we know the car's dimensions.
     # this is the diagonal size of the car divided by two
-    radious = 56
+    radious = 13.975
 
     point1 = [radious*math.cos(angle_1) + x, radious*math.sin(angle_1) + y]
     point2 = [radious*math.cos(angle_2) + x, radious*math.sin(angle_2) + y]
@@ -70,3 +78,7 @@ def get_bounding_points(x, y, angle):
     point4 = [radious*math.cos(angle_4) + x, radious*math.sin(angle_4) + y]
 
     return [point1,point2,point3,point4]
+
+def meters_to_pixels(meters):
+    # scale is 25 pixels per meter.
+    return meters * 25 

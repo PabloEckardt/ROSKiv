@@ -6,9 +6,9 @@
 #:set Width 10
 
 <SimCar>:
-    size: 100, 50
+    size: 25, 12.5
     angle: 0
-    pos: (150,150)
+    pos: (100,100)
     canvas.before:
         PushMatrix
         Rotate:
@@ -45,19 +45,19 @@
     Label:
         font_size: 15
         center_x: root.width * 18/20
-        top: root.top - root.top * 12/14
+        top: root.top - root.top * 9/14
         text: str(root.car_x_label)
 
     Label:
         font_size: 15
         center_x: root.width * 19/20
-        top: root.top - root.top * 12/14
+        top: root.top - root.top * 9/14
         text: str(root.car_y_label)
 
     Label:
         font_size: 15
         center_x: root.width * 18/20
-        top: root.top - root.top * 11/14
+        top: root.top - root.top * 10/14
         text: str(root.car_angle_label)
 
 	# LEFT

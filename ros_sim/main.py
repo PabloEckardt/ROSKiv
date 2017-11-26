@@ -1,13 +1,14 @@
 from kivy.app import App
 from kivy.uix.widget import Widget
-from kivy.properties import NumericProperty, ReferenceListProperty,\
-     ObjectProperty, StringProperty
+from kivy.properties import NumericProperty, \
+                            ReferenceListProperty,\
+                            ObjectProperty, \
+                            StringProperty 
 from kivy.vector import Vector
 from kivy.clock import Clock
 from kivy.graphics import Line, Color
 from kivy.animation import Animation
 from kivy.lang import Builder
-from random import randint
 from kivy.uix.textinput import TextInput
 from kivy.config import Config
 
@@ -15,17 +16,23 @@ import rospy
 from race.msg import pid_input
 from race.msg import pid_input
 
+import  sys
+import  os
 import  json
 import  pickle
-import  os
 import  math
 import  time
 from    enum import Enum
 from    datetime import datetime
 from    numpy import interp
 from    frame import frame
-from    geometry_funcs import find_intersection, get_bounding_points, dist_two_points, deg_to_rads
-import sys
+from    random import randint
+from    geometry_funcs import   find_intersection, \
+                                get_bounding_points, \
+                                dist_two_points,  \
+                                deg_to_rads, \
+                                contains, \
+                                meters_to_pixels
 
 
 pub = rospy.Publisher('error', pid_input, queue_size=1)
@@ -48,10 +55,12 @@ MAP_SELECTION = 1
 TARGET_CENTER = []
 STATUS_LABEL = "UNDETERMINED"
 LIDAR_TO_CAR_ANGLE = 45 # degrees
-LIDAR_RANGE = 250 # in cms
+LIDAR_RANGE = meters_to_pixels(2.5) # in cms
+CAMERA_RANGE = meters_to_pixels(4)
 SAVE_FILE = False
 FRAME_RATE = 60
 TRACE_ROUTE = True
+STARTING_POSITION = [100,100]
 
 
 class Wall(Widget):
@@ -119,8 +128,9 @@ class SimCar(Widget):
     relative_angle = 0
 
     def get_effective_angle(self, relative_angle):
-        relative_angle = 75 if relative_angle > 75 else -75 if relative_angle < -75 else relative_angle
-        return interp(relative_angle, [-75.0,75.0],[-.4,.4])
+
+        relative_angle = 65 if relative_angle > 65 else -65 if relative_angle < -65 else relative_angle
+        return interp(relative_angle, [-65.0,65.0],[-.82,.82])
 
 
     def move(self, frame):
@@ -128,9 +138,9 @@ class SimCar(Widget):
 
             self.angle += self.get_effective_angle(frame.target_angle)
 
-
-            velocity_x = math.cos((self.angle * math.pi) / 180)
-            velocity_y = math.sin((self.angle * math.pi) / 180)
+            # downscale vectors by half to make it easier to handle
+            velocity_x = math.cos((self.angle * math.pi) / 180) * .5
+            velocity_y = math.sin((self.angle * math.pi) / 180) * .5
 
             self.pos = Vector(self.pos[0], self.pos[1]) + Vector(velocity_x,velocity_y)
 
@@ -144,6 +154,7 @@ class Simulator(Widget): # Root Widget
     global x, y
     global RENDERED_FRAMES
 
+    camera_angle = 0
     lidar_angle = 0
     car_x_label = StringProperty("")
     car_y_label = StringProperty("")
@@ -212,13 +223,9 @@ class Simulator(Widget): # Root Widget
                                             TARGET_CENTER[0],
                                             TARGET_CENTER[1], 
                                             target[2]
-                                            ), width = 3)
+                                            ), width = 1)
             assert len (TARGET_CENTER) == 2
 
-    def start_vehicle(self):
-        with self.canvas:
-            self.lidar_beam = Line(points=[0,0,0,0])
-            self.pos = Vector(-500,-200)
 
 
     def check_border_collision(self):
@@ -264,7 +271,7 @@ class Simulator(Widget): # Root Widget
 
     def get_lidar_measurement(self):
 
-        distance = 1000
+        distance = 10000
         p1 = (self.lidar_beam.points[0], self.lidar_beam.points[1])
         p2 = (self.lidar_beam.points[2], self.lidar_beam.points[3])
         for b in self.barriers:
@@ -281,17 +288,11 @@ class Simulator(Widget): # Root Widget
         p1 = (self.car.get_center_x(), self.car.get_center_y())
         p2 = TARGET_CENTER
         # 60 is an arbitrary radious to determine if the vehicle is close enough
-        if dist_two_points(p1,p2) <= 60:
+        if dist_two_points(p1,p2) <= meters_to_pixels(.6):
             STATUS_LABEL = "SUCCESS"
             return True
         return False
 
-    def reset(self):
-        global TRACE_ROUTE
-        set_current_frame_id(0)
-        self.car.pos = [150,135]
-        self.car.angle = 0
-        TRACE_ROUTE = False
 
     def draw_labels(self):
         self.car_x_label = "x: " + str(int(self.car.get_center_x()))
@@ -326,9 +327,9 @@ class Simulator(Widget): # Root Widget
         global LIDAR_RANGE
         global LIDAR_TO_CAR_ANGLE
 
-        print(len(RENDERED_FRAMES))
-        if len(RENDERED_FRAMES) > 5:
-            pass
+        if len(RENDERED_FRAMES) == 1:
+            print self.car.pos
+            self.car.pos = STARTING_POSITION
 
         frame = get_next_frame(RENDERED_FRAMES)
         self.car.move(frame)
@@ -347,9 +348,10 @@ class Simulator(Widget): # Root Widget
             print ("resetting")
             self.reset()
         else:
+
             car_center_x, car_center_y = self.car.get_center_x(), self.car.get_center_y()
             # adjust angle so it remains relative to the car
-            adj_angle = self.lidar_angle + self.car.angle + LIDAR_TO_CAR_ANGLE
+            adj_angle = self.car.angle + LIDAR_TO_CAR_ANGLE
 
             # define a x for the lidar's beam end point
             lidar_target_x = (math.cos((adj_angle * math.pi)/180) \
@@ -358,22 +360,70 @@ class Simulator(Widget): # Root Widget
                              * LIDAR_RANGE) + car_center_y
 
             # update the lidar
-            self.lidar_beam.points = [  car_center_x,
+            self.lidar_beam.points = [  
+                                        car_center_x,
                                         car_center_y, 
                                         lidar_target_x, 
-                                        lidar_target_y]
+                                        lidar_target_y
+                                        ]
+
+            try:
+                camera_p2_x = (math.cos(( (self.car.angle + 35) * math.pi)/180) \
+                                 * CAMERA_RANGE) + car_center_x
+
+                camera_p2_y = (math.sin(( (self.car.angle + 35) * math.pi)/180) \
+                                 * CAMERA_RANGE) + car_center_y
+
+                camera_p3_x = (math.cos(( (self.car.angle - 35) * math.pi)/180) \
+                                 * CAMERA_RANGE) + car_center_x
+
+                camera_p3_y = (math.sin(( (self.car.angle - 35) * math.pi)/180) \
+                                 * CAMERA_RANGE) + car_center_y
+                # update the camera
+                self.camera_view.points = [ car_center_x, 
+                                            car_center_y,
+                                            camera_p2_x,
+                                            camera_p2_y,
+                                            camera_p3_x,
+                                            camera_p3_y,
+                                            car_center_x,
+                                            car_center_y
+                                            ]
+            except Exception as e:
+                print e
+
+
+
 
             # lidar collisions with barriers
             distance = self.get_lidar_measurement()
             msg = pid_input()
-            if distance is not 1000:
+            if distance is not 10000:
                 ############ YOUR CODE GOES HERE ################
                 # distance = distance to closer barrier if within range
-                msg.pid_error = interp(distance, [0,250],[-100,100])
+                msg.pid_error = interp(distance, [0,meters_to_pixels(2.5)],[-100,100])
             else:
-                msg.pid_error = 1000
+                msg.pid_error = 10000
 
             pub.publish(msg)
+
+
+    def reset(self):
+        global TRACE_ROUTE
+        global STARTING_POSITION
+
+        set_current_frame_id(0)
+        
+        self.car.pos = STARTING_POSITION
+        self.car.angle = 0
+        TRACE_ROUTE = False
+
+
+    def start_vehicle(self):
+        with self.canvas:
+            self.lidar_beam = Line(points=[0,0,0,0])
+            self.camera_view = Line(points=[0,0,0,0,0,0])
+        self.car.pos = STARTING_POSITION
 
 
 class SimApp(App):
@@ -383,6 +433,7 @@ class SimApp(App):
         simulator = Simulator()
         simulator.start_vehicle()
         simulator.load_map(MAP_SELECTION)
+        print (simulator.car.pos)
         Clock.schedule_interval(simulator.update, 1.0/FRAME_RATE)
         return simulator
 
@@ -390,7 +441,6 @@ class SimApp(App):
 if __name__ == '__main__':
 
     global MAP_SELECTION
-
     load_sim = None
 
     if len(sys.argv)  > 1:
