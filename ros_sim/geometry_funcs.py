@@ -2,17 +2,19 @@ import math
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
 
+
 def contains(point, polygon):
 
-    p = Point(point[0],point[1])
+    p = Point(point[0], point[1])
     pol = Polygon(polygon)
     return pol.contains(p)
 
 
-def dist_two_points(p1,p2):
+def dist_two_points(p1, p2):
     return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
 
-def find_intersection( p0, p1, p2, p3 ) :
+
+def find_intersection(p0, p1, p2, p3):
 
     s10_x = p1[0] - p0[0]
     s10_y = p1[1] - p0[1]
@@ -21,7 +23,8 @@ def find_intersection( p0, p1, p2, p3 ) :
 
     denom = s10_x * s32_y - s32_x * s10_y
 
-    if denom == 0 : return None # collinear
+    if denom == 0:
+        return None  # collinear
 
     denom_is_positive = denom > 0
 
@@ -30,26 +33,32 @@ def find_intersection( p0, p1, p2, p3 ) :
 
     s_numer = s10_x * s02_y - s10_y * s02_x
 
-    if (s_numer < 0) == denom_is_positive : return None # no collision
+    if (s_numer < 0) == denom_is_positive:
+        return None  # no collision
 
     t_numer = s32_x * s02_y - s32_y * s02_x
 
-    if (t_numer < 0) == denom_is_positive : return None # no collision
+    if (t_numer < 0) == denom_is_positive:
+        return None  # no collision
 
-    if (s_numer > denom) == denom_is_positive or (t_numer > denom) == denom_is_positive : return None # no collision
+    if (s_numer > denom) == denom_is_positive or (
+            t_numer > denom) == denom_is_positive:
+        return None  # no collision
 
     # collision detected
 
     t = t_numer / denom
 
-    intersection_point = [ p0[0] + (t * s10_x), p0[1] + (t * s10_y) ]
+    intersection_point = [p0[0] + (t * s10_x), p0[1] + (t * s10_y)]
 
-    d = dist_two_points (p0, intersection_point)
+    d = dist_two_points(p0, intersection_point)
 
     return d
-    
+
+
 def deg_to_rads(deg):
-    return (deg*math.pi)/180.0
+    return (deg * math.pi) / 180.0
+
 
 def get_bounding_points(x, y, angle):
     """
@@ -72,13 +81,14 @@ def get_bounding_points(x, y, angle):
     # this is the diagonal size of the car divided by two
     radious = 13.975
 
-    point1 = [radious*math.cos(angle_1) + x, radious*math.sin(angle_1) + y]
-    point2 = [radious*math.cos(angle_2) + x, radious*math.sin(angle_2) + y]
-    point3 = [radious*math.cos(angle_3) + x, radious*math.sin(angle_3) + y]
-    point4 = [radious*math.cos(angle_4) + x, radious*math.sin(angle_4) + y]
+    point1 = [radious * math.cos(angle_1) + x, radious * math.sin(angle_1) + y]
+    point2 = [radious * math.cos(angle_2) + x, radious * math.sin(angle_2) + y]
+    point3 = [radious * math.cos(angle_3) + x, radious * math.sin(angle_3) + y]
+    point4 = [radious * math.cos(angle_4) + x, radious * math.sin(angle_4) + y]
 
-    return [point1,point2,point3,point4]
+    return [point1, point2, point3, point4]
+
 
 def meters_to_pixels(meters):
     # scale is 25 pixels per meter.
-    return meters * 25 
+    return meters * 25
