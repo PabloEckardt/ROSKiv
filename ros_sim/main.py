@@ -1,8 +1,8 @@
 from kivy.app import App
 from kivy.uix.widget import Widget
-from kivy.properties import NumericProperty, \
+from kivy.properties import NumericProperty,\
                             ReferenceListProperty,\
-                            ObjectProperty, \
+                            ObjectProperty,\
                             StringProperty 
 from kivy.vector import Vector
 from kivy.clock import Clock
@@ -34,9 +34,12 @@ from    geometry_funcs import   find_intersection, \
                                 contains, \
                                 meters_to_pixels
 
+from image_generator import make_image
+
 
 pub = rospy.Publisher('error', pid_input, queue_size=1)
 Builder.load_file("Sim.kv")
+
 Config.set('graphics', 'width', '1400')
 Config.set('graphics', 'height', '720')
 Config.set('graphics', 'resizable', False)
@@ -47,6 +50,7 @@ class SAVE_OPTIONS(Enum):
     FAILURE = 2
     SUCCESS_FAILURE = 3
 
+
 RENDERED_FRAMES =[frame()]
 CURRENT_FRAME_ID = 0
 LATEST_PUB_ANGLE = 0
@@ -55,12 +59,14 @@ MAP_SELECTION = 1
 TARGET_CENTER = []
 STATUS_LABEL = "UNDETERMINED"
 LIDAR_TO_CAR_ANGLE = 45 # degrees
-LIDAR_RANGE = meters_to_pixels(2.5) # in cms
+LIDAR_RANGE = meters_to_pixels(2.5)
 CAMERA_RANGE = meters_to_pixels(4)
 SAVE_FILE = False
 FRAME_RATE = 60
 TRACE_ROUTE = True
 STARTING_POSITION = [100,100]
+SIM_FLAG = False
+PHOTO_FRAME_COUNT = 0
 
 
 class Wall(Widget):
@@ -123,7 +129,6 @@ def get_next_frame(RENDERED_FRAMES):
 
 
 class SimCar(Widget):
-
 
     relative_angle = 0
 
@@ -197,35 +202,58 @@ class Simulator(Widget): # Root Widget
         global TARGET_CENTER
         print "loading the map"
         with self.canvas:
-            with open ("maps.json", "r") as mapfile:
-                map_data = json.load(mapfile)
-                # select a map from the json
-                m = map_data[str(map_id)]
-                # Draw the lines
-                self.barriers = []
-                for k in m:
-                    if not k == "target":
-                        self.barriers.append(ObjectProperty(None,
-                                                            allownone=True))
-                        _line = map(int,m[k].split(","))
+            try:
+                with open ("maps.json", "r") as mapfile:
+                    map_data = json.load(mapfile)
+                    # select a map from the json
+                    m = map_data[str(map_id)]
+                    print ("a")
+                    #draw barriers
+                    self.barriers = []
+                    b = m["barriers"]
+                    self.barriers = [ObjectProperty(None, allownone=True) for e in range(len(b))]
+                    for i,line in enumerate(b):
+                        _line = map(int, line.split(","))
                         points = _line[0:4] 
                         r = _line[4]
                         g = _line[5]
-                        b = _line[6]
-                        Color(r,g,b)
-                        self.barriers[len(self.barriers) - 1] = Line(points=points)
-                # Draw the target
-                target = map(int,m["target"].split(","))
-                TARGET_CENTER = [int(target[0]), int(target[1])]
-                self.target = ObjectProperty(None,allownone=True)
-                Color (67/255.0,242/255.0,155/255.0)
-                self.target = Line(circle=( 
-                                            TARGET_CENTER[0],
-                                            TARGET_CENTER[1], 
-                                            target[2]
-                                            ), width = 1)
-            assert len (TARGET_CENTER) == 2
+                        _b = _line[6]
+                        Color(r,g,_b)
+                        self.barriers[len(self.barriers) - i - 1] = Line(points=points)
+                    # Draw the target
+                    target = map(int,m["target"].split(","))
+                    TARGET_CENTER = [int(target[0]), int(target[1])]
+                    self.target = ObjectProperty(None,allownone=True)
+                    Color (67/255.0, 242/255.0, 155/255.0)
+                    self.target = Line(circle=( 
+                                                TARGET_CENTER[0],
+                                                TARGET_CENTER[1], 
+                                                target[2]
+                                                ), 
+                                                width = 1)
 
+                    # draw shapes for camera
+                    shapes = m["cam_targets"]
+                    shape_no = len(shapes)
+
+                    if shape_no > 0:
+                        self.camera_shapes = [ObjectProperty(None, allownone=True) for e in range (len(b) + 1)]
+                        for i,shape in enumerate(shapes):
+                            _shape = map(int,shape.split(",")) 
+                            center = _shape[0:2]
+                            radious = _shape[2]
+                            r = _shape[3]
+                            g = _shape[4]
+                            _b = _shape[5]
+                            Color (r,g,_b)
+                            self.camera_shapes[shape_no - i - 1] = Line(circle=(center[0],
+                                                                                center[1],
+                                                                                radious),
+                                                                                width = 3)
+                assert len (TARGET_CENTER) == 2
+            except Exception as e:
+                print (e)
+                sys.exit(1)
 
 
     def check_border_collision(self):
@@ -237,7 +265,6 @@ class Simulator(Widget): # Root Widget
             STATUS_LABEL = "FAILURE"
             return True
         return False
-
 
 
     def check_barrier_collision(self):
@@ -269,8 +296,10 @@ class Simulator(Widget): # Root Widget
                     return True
         return False
 
+
     def get_lidar_measurement(self):
 
+        # 10000 is just the value it reports if anything is too far
         distance = 10000
         p1 = (self.lidar_beam.points[0], self.lidar_beam.points[1])
         p2 = (self.lidar_beam.points[2], self.lidar_beam.points[3])
@@ -321,15 +350,41 @@ class Simulator(Widget): # Root Widget
                     except Exception as e:
                         print ("failure to save log") 
 
+    def take_photo(self,cam):
+        global PHOTO_FRAME_COUNT
+        for shape in self.camera_shapes:
+            saw_shape = True
+            circlex,circley = shape.points[0:2]
+            circley -= 3 # Offset y to match center
+            if contains ((circlex,circley), cam):
+                circle_point = (circlex,circley)
+                car_point = (self.car.get_center_x(), self.car.get_center_y())
+                for b in self.barriers:
+                    barrier_point1 = (b.points[0], b.points[1])
+                    barrier_point2 = (b.points[2], b.points[3])
+                    shot = find_intersection(circle_point, car_point, barrier_point1, barrier_point2)
+                    if shot is not None: # at least one barrier blocks vision
+                        saw_shape = False
+                        break 
+                if saw_shape:
+                    dist = dist_two_points(circle_point, car_point)
+                    x_offset_diff = cam[1][0] - circlex
+                    make_image(dist, PHOTO_FRAME_COUNT + 1, CURRENT_FRAME_ID)
+                    PHOTO_FRAME_COUNT += 1
+
+            if not saw_shape:
+                # there is a shape behind a wall
+                pass
 
     def update(self, dt):
 
         global LIDAR_RANGE
         global LIDAR_TO_CAR_ANGLE
+        global SIM_FLAG
 
-        if len(RENDERED_FRAMES) == 1:
-            print self.car.pos
+        if len(RENDERED_FRAMES) == 1 or SIM_FLAG:
             self.car.pos = STARTING_POSITION
+            SIM_FLAG = False
 
         frame = get_next_frame(RENDERED_FRAMES)
         self.car.move(frame)
@@ -337,6 +392,7 @@ class Simulator(Widget): # Root Widget
         barrier_collision = False
         border_collision = False
         target_reached = False
+
         try:
             barrier_collision = self.check_barrier_collision()
             border_collision = self.check_border_collision()
@@ -389,6 +445,13 @@ class Simulator(Widget): # Root Widget
                                             car_center_x,
                                             car_center_y
                                             ]
+                if CURRENT_FRAME_ID % 25 == 0:            
+                    self.take_photo((
+                        (car_center_x, car_center_y),
+                        (camera_p2_x, camera_p2_y),
+                        (camera_p3_x, camera_p3_y)
+                        ))
+
             except Exception as e:
                 print e
 
@@ -411,12 +474,13 @@ class Simulator(Widget): # Root Widget
     def reset(self):
         global TRACE_ROUTE
         global STARTING_POSITION
-
+        global PHOTO_FRAME_COUNT
         set_current_frame_id(0)
         
         self.car.pos = STARTING_POSITION
         self.car.angle = 0
         TRACE_ROUTE = False
+        PHOTO_FRAME_COUNT = 0
 
 
     def start_vehicle(self):
@@ -433,7 +497,6 @@ class SimApp(App):
         simulator = Simulator()
         simulator.start_vehicle()
         simulator.load_map(MAP_SELECTION)
-        print (simulator.car.pos)
         Clock.schedule_interval(simulator.update, 1.0/FRAME_RATE)
         return simulator
 
@@ -441,6 +504,7 @@ class SimApp(App):
 if __name__ == '__main__':
 
     global MAP_SELECTION
+    global SIM_FLAG
     load_sim = None
 
     if len(sys.argv)  > 1:
@@ -458,6 +522,7 @@ if __name__ == '__main__':
 
         if load_sim == "y" or load_sim == "yes":
             # if loading dont need to save
+            SIM_FLAG = True
             SAVE_TRIGGER = SAVE_OPTIONS.NO
             l = os.listdir("simulations/")
             for index,sim in enumerate(l):
