@@ -8,7 +8,7 @@ WIDTH = 512
 HEIGHT = 512
 
 def get_x_offset(x_offset):
-	return  int(np.interp(x_offset, [0,60], [120,-120]))
+	return  int(np.interp(x_offset, [0,60], [-120,120]))
 
 def make_image(distance, count, x_offset, color = (0,0,255)):
 
