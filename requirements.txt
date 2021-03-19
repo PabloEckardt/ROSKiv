@@ -35,7 +35,7 @@ httplib2==0.9.1
 idna==2.0
 image-geometry==1.12.4
 interactive-markers==1.11.3
-Jinja2==2.8
+Jinja2==2.11.3
 Kivy==1.10.0
 Kivy-Garden==0.1.4
 language-selector==0.1
