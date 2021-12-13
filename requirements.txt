@@ -41,7 +41,7 @@ Kivy-Garden==0.1.4
 language-selector==0.1
 laser-geometry==1.6.4
 louis==2.6.4
-lxml==3.5.0
+lxml==4.6.5
 Mako==1.0.3
 MarkupSafe==0.23
 message-filters==1.12.7
